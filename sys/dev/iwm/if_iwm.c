@@ -5431,9 +5431,6 @@ iwm_handle_rxb(struct iwm_softc *sc, struct mbuf *m)
 		 * Firmware versions 21 and 22 generate some DEBUG_LOG_MSG
 		 * messages. Just ignore them for now.
 		 */
-		case IWM_DEBUG_LOG_MSG:
-			break;
-
 		case IWM_MCAST_FILTER_CMD:
 		case IWM_DEBUG_LOG_MSG:
 			break;
