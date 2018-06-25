@@ -51,6 +51,8 @@ typedef int et_start_t(struct eventtimer *et,
 typedef int et_stop_t(struct eventtimer *et);
 typedef void et_event_cb_t(struct eventtimer *et, void *arg);
 typedef int et_deregister_cb_t(struct eventtimer *et, void *arg);
+typedef int et_set_nmi_mode_t(struct eventtimer *et, boolean_t enable);
+typedef int et_check_nmi_t(struct eventtimer *et);
 
 struct eventtimer {
 	SLIST_ENTRY(eventtimer)	et_all;
@@ -59,11 +61,12 @@ struct eventtimer {
 		/* Name of the event timer. */
 	int			et_flags;
 		/* Set of capabilities flags: */
-#define ET_FLAGS_PERIODIC	1
-#define ET_FLAGS_ONESHOT	2
-#define ET_FLAGS_PERCPU		4
-#define ET_FLAGS_C3STOP		8
-#define ET_FLAGS_POW2DIV	16
+#define ET_FLAGS_PERIODIC	0x01
+#define ET_FLAGS_ONESHOT	0x02
+#define ET_FLAGS_PERCPU		0x04
+#define ET_FLAGS_C3STOP		0x08
+#define ET_FLAGS_POW2DIV	0x10
+#define ET_FLAGS_NMI		0x20	/* timer can deliver NMI */
 	int			et_quality;
 		/*
 		 * Used to determine if this timecounter is better than
@@ -78,6 +81,8 @@ struct eventtimer {
 	et_stop_t		*et_stop;
 	et_event_cb_t		*et_event_cb;
 	et_deregister_cb_t	*et_deregister_cb;
+	et_set_nmi_mode_t	*et_set_nmi_mode;
+	et_check_nmi_t		*et_check_nmi;
 	void 			*et_arg;
 	void			*et_priv;
 	struct sysctl_oid	*et_sysctl;
@@ -100,6 +105,8 @@ int	et_start(struct eventtimer *et, sbintime_t first, sbintime_t period);
 int	et_stop(struct eventtimer *et);
 int	et_ban(struct eventtimer *et);
 int	et_free(struct eventtimer *et);
+int	et_set_nmi_mode(struct eventtimer *et, boolean_t enable);
+int	et_check_nmi(struct eventtimer *et);
 
 #ifdef SYSCTL_DECL
 SYSCTL_DECL(_kern_eventtimer);

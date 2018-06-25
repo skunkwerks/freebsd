@@ -68,6 +68,10 @@ et_register(struct eventtimer *et)
 		}
 	}
 	KASSERT(et->et_start, ("et_register: timer has no start function"));
+	if ((et->et_flags & ET_FLAGS_NMI) != 0) {
+		KASSERT(et->et_set_nmi_mode != NULL && et->et_check_nmi != NULL,
+		    ("timer claims to support NMI but does not provide hooks"));
+	}
 	et->et_sysctl = SYSCTL_ADD_NODE_WITH_LABEL(NULL,
 	    SYSCTL_STATIC_CHILDREN(_kern_eventtimer_et), OID_AUTO, et->et_name,
 	    CTLFLAG_RW, 0, "event timer description", "eventtimer");
@@ -235,6 +239,29 @@ et_free(struct eventtimer *et)
 
 	et->et_active = 0;
 	return (0);
+}
+
+/* Enable or disable Non-Maskable mode of timer interrupt delivery. */
+int
+et_set_nmi_mode(struct eventtimer *et, boolean_t enable)
+{
+
+	if (!et->et_active)
+		return (ENXIO);
+	if ((et->et_flags & ET_FLAGS_NMI) == 0)
+		return (ENOTSUP);
+	return (et->et_set_nmi_mode(et, enable));
+}
+
+int
+et_check_nmi(struct eventtimer *et)
+{
+
+	if (!et->et_active)
+		return (ENXIO);
+	if ((et->et_flags & ET_FLAGS_NMI) == 0)
+		return (ENOTSUP);
+	return (et->et_check_nmi(et));
 }
 
 /* Report list of supported event timer hardware via sysctl. */

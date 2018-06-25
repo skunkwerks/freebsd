@@ -149,6 +149,12 @@ static int enable_extint;
 SYSCTL_INT(_hw_apic, OID_AUTO, enable_extint, CTLFLAG_RDTUN, &enable_extint, 0,
     "Enable the ExtINT pin in the first I/O APIC");
 
+int amd_intr_delmode_bug;
+SYSCTL_INT(_hw_apic, OID_AUTO, amd_intr_delmode_bug, CTLFLAG_RDTUN,
+    &amd_intr_delmode_bug, 0,
+    "IO-APIC and MSI Interrupt delivery mode is interpreted according to "
+    "HyperTransport specification");
+
 static void
 _ioapic_eoi_source(struct intsrc *isrc, int locked)
 {

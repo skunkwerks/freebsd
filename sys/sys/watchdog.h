@@ -118,8 +118,11 @@ int	wdog_kern_pat(u_int utim);
  * if no hardware watchdog has been attached, and if the software module
  * has initialized the function pointer.
  */
-
 extern void (*wdog_software_attach)(void);
-#endif
+
+#ifdef NMI_WATCHDOG
+int	nmi_watchdog_check(void);
+#endif /* NMI_WATCHDOG */
+#endif /* _KERNEL */
 
 #endif /* _SYS_WATCHDOG_H */

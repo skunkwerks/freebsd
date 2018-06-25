@@ -57,8 +57,13 @@ __FBSDID("$FreeBSD$");
 #include <dev/acpica/acpi_hpet.h>
 
 #ifdef DEV_APIC
-#include "pcib_if.h"
+#include <x86/apicreg.h>
+#ifdef SMP
+#include <x86/x86_smp.h>
 #endif
+#include <x86/x86_var.h>
+#include "pcib_if.h"
+#endif /* DEV_APIC */
 
 #define HPET_VENDID_AMD		0x4353
 #define HPET_VENDID_AMD2	0x1022
@@ -112,6 +117,7 @@ struct hpet_softc {
 		uint32_t		div;
 		uint32_t		next;
 		char			name[8];
+		bool			nmi;
 	} 			t[32];
 	int			num_timers;
 	struct cdev		*pdev;
@@ -215,10 +221,16 @@ hpet_start(struct eventtimer *et, sbintime_t first, sbintime_t period)
 		t->mode = TIMER_ONESHOT;
 		t->div = 0;
 	}
-	if (first != 0)
+	KASSERT(!t->nmi || t->mode == TIMER_ONESHOT,
+	    ("NMI timer started in periodic mode"));
+	if (first != 0) {
 		fdiv = (sc->freq * first) >> 32;
-	else
+		/* Save calculated timeout for the sake of resume. */
+		if (t->nmi)
+			t->div = fdiv;
+	} else {
 		fdiv = t->div;
+	}
 	if (t->irq < 0)
 		bus_write_4(sc->mem_res, HPET_ISR, 1 << t->num);
 	t->caps |= HPET_TCNF_INT_ENB;
@@ -260,6 +272,99 @@ hpet_stop(struct eventtimer *et)
 	t->caps &= ~(HPET_TCNF_INT_ENB | HPET_TCNF_TYPE);
 	bus_write_4(sc->mem_res, HPET_TIMER_CAP_CNF(t->num), t->caps);
 	return (0);
+}
+
+#if defined(DEV_APIC)
+static int
+hpet_fsb_setup(struct hpet_timer *t)
+{
+	struct hpet_softc *sc = t->sc;
+	uint64_t addr;
+	uint32_t data;
+	int err;
+
+	err = PCIB_MAP_MSI(device_get_parent(device_get_parent(sc->dev)),
+	    sc->dev, t->irq, &addr, &data);
+	if (err != 0)
+		return (err);
+	/*
+	 * If NMI mode is disabled, then use the returned values as is.
+	 * Otherwise, directly configure NMI delivery mode.
+	 * Destination ID is either set to BSP or to broadcast.
+	 * This code has some direct knowledge of MSI internals.
+	 */
+	if (t->nmi) {
+		data = IOART_TRGREDG;
+		data |= amd_intr_delmode_bug ? IOART_DELRSV1 : IOART_DELNMI;
+#ifdef SMP
+		addr &= ~0x000ff000u;
+		addr |= (nmi_is_broadcast ? 0xff : boot_cpu_id) << 12;
+#endif
+	}
+	bus_write_4(sc->mem_res, HPET_TIMER_FSB_ADDR(t->num), addr);
+	bus_write_4(sc->mem_res, HPET_TIMER_FSB_VAL(t->num), data);
+	return (0);
+}
+#endif
+
+static int
+hpet_set_nmi_mode(struct eventtimer *et, boolean_t enable)
+{
+#if defined(DEV_APIC)
+	struct hpet_timer *mt = (struct hpet_timer *)et->et_priv;
+	struct hpet_softc *sc = mt->sc;
+	struct hpet_timer *t;
+	int err;
+
+	t = (mt->pcpu_master < 0) ? mt : &sc->t[mt->pcpu_slaves[curcpu]];
+	if ((t->caps & HPET_TCNF_FSB_EN) == 0)
+		return (ENOTSUP);
+
+	if (t->nmi == enable)
+		return (0);
+	t->nmi = enable;
+	err = hpet_fsb_setup(t);
+	if (err != 0)
+		t->nmi = !enable;
+	return (err);
+#else /* DEV_APIC */
+	return (ENOTSUP);
+#endif /* DEV_APIC */
+}
+
+static int
+hpet_check_nmi(struct eventtimer *et)
+{
+#if defined(DEV_APIC)
+	struct hpet_timer *mt = (struct hpet_timer *)et->et_priv;
+	struct hpet_softc *sc = mt->sc;
+	struct hpet_timer *t;
+	uint32_t val;
+
+	t = (mt->pcpu_master < 0) ? mt : &sc->t[mt->pcpu_slaves[curcpu]];
+	if ((t->caps & HPET_TCNF_FSB_EN) == 0)
+		return (ENOTSUP);
+
+	if (!t->nmi)
+		return (ENOENT);
+
+	val = bus_read_4(sc->mem_res, HPET_ISR);
+	if ((val & (1 << t->num)) == 0)
+		return (ENOENT);
+
+	/*
+	 * Clear the interrupt stats bit as well as interrupt enable bit
+	 * to avoid another NMI after the counter wrap-around.
+	 * With a 32-bit counter and a typical frequency the wrap-around
+	 * happens in less than 5 minutes.
+	 */
+	bus_write_4(sc->mem_res, HPET_ISR, 1 << t->num);
+	t->caps &= ~HPET_TCNF_INT_ENB;
+	bus_write_4(sc->mem_res, HPET_TIMER_CAP_CNF(t->num), t->caps);
+	return (0);
+#else /* DEV_APIC */
+	return (ENOTSUP);
+#endif /* DEV_APIC */
 }
 
 static int
@@ -743,18 +848,9 @@ hpet_attach(device_t dev)
 		} else
 #ifdef DEV_APIC
 		if ((t->caps & HPET_TCAP_FSB_INT_DEL) && t->irq >= 0) {
-			uint64_t addr;
-			uint32_t data;
-
-			if (PCIB_MAP_MSI(
-			    device_get_parent(device_get_parent(dev)), dev,
-			    t->irq, &addr, &data) == 0) {
-				bus_write_4(sc->mem_res,
-				    HPET_TIMER_FSB_ADDR(i), addr);
-				bus_write_4(sc->mem_res,
-				    HPET_TIMER_FSB_VAL(i), data);
+			if (hpet_fsb_setup(t) == 0)
 				t->caps |= HPET_TCNF_FSB_EN;
-			} else
+			else
 				t->irq = -2;
 		} else
 #endif
@@ -775,6 +871,10 @@ hpet_attach(device_t dev)
 			t->et.et_name = t->name;
 		}
 		t->et.et_flags = ET_FLAGS_PERIODIC | ET_FLAGS_ONESHOT;
+#if defined(DEV_APIC)
+		if ((t->caps & HPET_TCNF_FSB_EN) != 0)
+			t->et.et_flags |= ET_FLAGS_NMI;
+#endif
 		t->et.et_quality = 450;
 		if (t->pcpu_master >= 0) {
 			t->et.et_flags |= ET_FLAGS_PERCPU;
@@ -789,6 +889,8 @@ hpet_attach(device_t dev)
 		t->et.et_max_period = (0xfffffffeLLU << 32) / sc->freq;
 		t->et.et_start = hpet_start;
 		t->et.et_stop = hpet_stop;
+		t->et.et_set_nmi_mode = hpet_set_nmi_mode;
+		t->et.et_check_nmi = hpet_check_nmi;
 		t->et.et_priv = &sc->t[i];
 		if (t->pcpu_master < 0 || t->pcpu_master == i) {
 			et_register(&t->et);
@@ -868,19 +970,8 @@ hpet_resume(device_t dev)
 	for (i = 0; i < sc->num_timers; i++) {
 		t = &sc->t[i];
 #ifdef DEV_APIC
-		if (t->irq >= 0 && (sc->legacy_route == 0 || i >= 2)) {
-			uint64_t addr;
-			uint32_t data;
-
-			if (PCIB_MAP_MSI(
-			    device_get_parent(device_get_parent(dev)), dev,
-			    t->irq, &addr, &data) == 0) {
-				bus_write_4(sc->mem_res,
-				    HPET_TIMER_FSB_ADDR(i), addr);
-				bus_write_4(sc->mem_res,
-				    HPET_TIMER_FSB_VAL(i), data);
-			}
-		}
+		if ((t->caps & HPET_TCNF_FSB_EN) != 0)
+			(void)hpet_fsb_setup(t);
 #endif
 		if (t->mode == TIMER_STOPPED)
 			continue;
@@ -897,7 +988,7 @@ hpet_resume(device_t dev)
 			bus_write_4(sc->mem_res, HPET_TIMER_COMPARATOR(t->num),
 			    t->div);
 		} else {
-			t->next += sc->freq / 1024;
+			t->next += t->nmi ? t->div : sc->freq / 1024;
 			bus_write_4(sc->mem_res, HPET_TIMER_COMPARATOR(t->num),
 			    t->next);
 		}
@@ -942,24 +1033,16 @@ hpet_remap_intr(device_t dev, device_t child, u_int irq)
 {
 	struct hpet_softc *sc = device_get_softc(dev);
 	struct hpet_timer *t;
-	uint64_t addr;
-	uint32_t data;
 	int error, i;
 
 	for (i = 0; i < sc->num_timers; i++) {
 		t = &sc->t[i];
 		if (t->irq != irq)
 			continue;
-		error = PCIB_MAP_MSI(
-		    device_get_parent(device_get_parent(dev)), dev,
-		    irq, &addr, &data);
-		if (error)
-			return (error);
 		hpet_disable(sc); /* Stop timer to avoid interrupt loss. */
-		bus_write_4(sc->mem_res, HPET_TIMER_FSB_ADDR(i), addr);
-		bus_write_4(sc->mem_res, HPET_TIMER_FSB_VAL(i), data);
+		error = hpet_fsb_setup(t);
 		hpet_enable(sc);
-		return (0);
+		return (error);
 	}
 	return (ENOENT);
 }

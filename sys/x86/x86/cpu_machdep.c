@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_maxmem.h"
 #include "opt_mp_watchdog.h"
 #include "opt_platform.h"
+#include "opt_watchdog.h"
 #ifdef __i386__
 #include "opt_apic.h"
 #endif
@@ -72,6 +73,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
+#ifdef NMI_WATCHDOG
+#include <sys/watchdog.h>
+#endif
 
 #include <machine/clock.h>
 #include <machine/cpu.h>
@@ -742,6 +746,14 @@ void
 nmi_call_kdb(u_int cpu, u_int type, struct trapframe *frame)
 {
 	bool claimed = false;
+
+
+#ifdef NMI_WATCHDOG
+	if (nmi_watchdog_check()) {
+		claimed = true;
+		panic("NMI watchdog");
+	}
+#endif /* NMI_WATCHDOG */
 
 #ifdef DEV_ISA
 	/* machine/parity/power fail/"kitchen sink" faults */

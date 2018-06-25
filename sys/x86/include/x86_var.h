@@ -86,6 +86,7 @@ extern	u_int	max_apic_id;
 extern	int	pti;
 extern	int	hw_ibrs_active;
 extern	int	hw_ssb_active;
+extern	int	amd_intr_delmode_bug;
 
 struct	pcb;
 struct	thread;

@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD$");
  */
 
 #include "opt_device_polling.h"
+#include "opt_watchdog.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -50,6 +51,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/timeet.h>
 #include <sys/timetc.h>
+#if defined(NMI_WATCHDOG)
+#include <sys/watchdog.h>
+#endif
 
 #include <machine/atomic.h>
 #include <machine/clock.h>
@@ -586,6 +590,162 @@ round_freq(struct eventtimer *et, int freq)
 	return (freq);
 }
 
+#if defined(NMI_WATCHDOG)
+static int nmi_wd_enable;
+static struct eventtimer *nmi_wd_et;
+static eventhandler_tag nmi_wd_event;
+static sbintime_t nmi_wd_period;
+
+static void
+nmicb(struct eventtimer *et, void *arg)
+{
+
+	printf("bug: timer callback invoked while in NMI mode\n");
+}
+
+int
+nmi_watchdog_check(void)
+{
+	int err;
+
+	if (nmi_wd_et == NULL)
+		return (0);
+	err = et_check_nmi(nmi_wd_et);
+	return (err == 0);
+}
+
+static void
+nmi_watchdog_config(struct eventtimer *et, u_int cmd, int *error)
+{
+	sbintime_t when;
+	uint64_t ns;
+	uint64_t hi;
+	uint64_t lo;
+	int ret;
+
+	if (cmd != 0) {
+		/*
+		 * Nanoseconds are multiplied by 2^32 and divided by 10^9.
+		 * To avoid overflow and loss of precision the above order
+		 * is used for the lower 32 bits, while the upper 32-bits
+		 * are first divided and then multiplied.
+		 */
+		cmd &= WD_INTERVAL;
+		ns = (uint64_t)1 << cmd;
+		hi = (ns >> 32) << 32;
+		lo = ns & (((uint64_t)1 << 32) - 1);
+		when = ((hi / 1000000000) << 32) + (lo << 32) / 1000000000;
+
+		if (when < et->et_min_period)
+			when = et->et_min_period;
+		if (when <= et->et_max_period) {
+			nmi_wd_period = when;
+			ret = et_start(et, when, 0);
+
+			/* If success, report it. */
+			if (ret == 0)
+				*error = 0;
+			return;
+		}
+	}
+
+	/*
+	 * The timer is stopped if the requested timeout is too large
+	 * or we are asked to stop the timer.
+	 * If we were asked to stop and failed, then report the error.
+	 */
+	nmi_wd_period = 0;
+	ret = et_stop(et);
+	if (cmd == 0 && ret != 0)
+		*error = EOPNOTSUPP;
+}
+
+static int
+init_nmi_watchdog(void)
+{
+	int error;
+
+	/*
+	 * For now do not use per-cpu timers, so that only one NMI is delivered.
+	 * Also, it would be nice to be able to specify a minimum requirement
+	 * on et_max_period.
+	 */
+	nmi_wd_et = et_find(NULL,
+	    ET_FLAGS_ONESHOT | ET_FLAGS_NMI | ET_FLAGS_PERCPU,
+	    ET_FLAGS_ONESHOT | ET_FLAGS_NMI);
+	if (nmi_wd_et == NULL) {
+		printf("NMI watchdog: failed to find suitable timer\n");
+		return (ENXIO);
+	}
+
+	printf("NMI watchdog: found timer %s\n", nmi_wd_et->et_name);
+	error = et_init(nmi_wd_et, nmicb, NULL, NULL);
+	if (error != 0) {
+		printf("NMI watchdog: failed to claim the timer\n");
+		nmi_wd_et = NULL;
+		return (error);
+	}
+	error = et_set_nmi_mode(nmi_wd_et, true);
+	if (error == 0) {
+		printf("NMI watchdog: using timer %s\n", nmi_wd_et->et_name);
+		printf("maximum supported timeout is %ju seconds\n",
+		    (uintmax_t)nmi_wd_et->et_max_period / SBT_1S);
+		nmi_wd_event = EVENTHANDLER_REGISTER(watchdog_list,
+		    nmi_watchdog_config, nmi_wd_et, 0);
+	} else {
+		printf("NMI watchdog: failed to set NMI mode\n");
+		(void)et_free(nmi_wd_et);
+		nmi_wd_et = NULL;
+	}
+	return (error);
+}
+
+static int
+disable_nmi_watchdog(void)
+{
+	int error = 0;
+
+	/* First, disengage from consumers. */
+	EVENTHANDLER_DEREGISTER(watchdog_list, nmi_wd_event);
+
+	/* Stop the timer. */
+	nmi_watchdog_config(nmi_wd_et, 0, &error);
+	if (error == 0) {
+		error = et_set_nmi_mode(nmi_wd_et, false);
+		if (error == 0) {
+			(void)et_free(nmi_wd_et);
+			nmi_wd_et = NULL;
+			printf("NMI watchdog: disabled\n");
+		}
+	}
+	if (error != 0)
+		nmi_wd_event = EVENTHANDLER_REGISTER(watchdog_list,
+		    nmi_watchdog_config, nmi_wd_et, 0);
+	return (error);
+}
+
+static int
+nmi_wd_sysctl(SYSCTL_HANDLER_ARGS)
+{
+	int enable;
+	int error;
+
+	enable = nmi_wd_et != NULL;
+	error = sysctl_handle_int(oidp, &enable, 0, req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+	if (enable != 0)
+		error = init_nmi_watchdog();
+	else
+		error = disable_nmi_watchdog();
+	return (error);
+}
+
+SYSCTL_PROC(_kern, OID_AUTO, nmi_watchdog_enable,
+    CTLTYPE_INT | CTLFLAG_RWTUN | CTLFLAG_NOFETCH,
+    NULL, 0, nmi_wd_sysctl, "I", "Enable NMI watchdog based on event timers");
+#endif
+
 /*
  * Configure and start event timers (BSP part).
  */
@@ -672,6 +832,12 @@ cpu_initclocks_bsp(void)
 	ET_LOCK();
 	configtimer(1);
 	ET_UNLOCK();
+
+#if defined(NMI_WATCHDOG)
+	TUNABLE_INT_FETCH("kern.nmi_watchdog_enable", &nmi_wd_enable);
+	if (nmi_wd_enable)
+		init_nmi_watchdog();
+#endif
 }
 
 /*
