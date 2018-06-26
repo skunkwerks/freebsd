@@ -561,14 +561,14 @@ static struct witness_order_list_entry order_lists[] = {
 	/*
 	 * UDP/IP
 	 */
-	{ "udp", &lock_class_mtx_sleep },
+	{ "udp", &lock_class_rw },
 	{ "udpinp", &lock_class_rw },
 	{ "so_snd", &lock_class_mtx_sleep },
 	{ NULL, NULL },
 	/*
 	 * TCP/IP
 	 */
-	{ "tcp", &lock_class_mtx_sleep },
+	{ "tcp", &lock_class_rw },
 	{ "tcpinp", &lock_class_rw },
 	{ "so_snd", &lock_class_mtx_sleep },
 	{ NULL, NULL },
