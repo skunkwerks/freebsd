@@ -259,6 +259,8 @@
     ..
     lib80211
     ..
+    lib9p
+    ..
     libipt
     ..
     libmilter
