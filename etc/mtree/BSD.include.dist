@@ -261,6 +261,8 @@
     ..
     libipt
     ..
+    lib9p
+    .
     libmilter
     ..
     libxo

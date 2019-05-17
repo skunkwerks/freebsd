@@ -11,6 +11,7 @@
 SUBDIR_BOOTSTRAP= \
 	csu \
 	.WAIT \
+	lib9p \
 	libc \
 	libc_nonshared \
 	libcompiler_rt \

@@ -12,6 +12,7 @@ PACKAGE=	bhyve
 MAN=	bhyve.8
 
 BHYVE_SYSDIR?=${SRCTOP}
+.PATH:		${BHYVE_SYSDIR}/contrib/lib9p
 
 SRCS=	\
 	atkbdc.c		\
@@ -41,6 +42,7 @@ SRCS=	\
 	pci_lpc.c		\
 	pci_nvme.c		\
 	pci_passthru.c		\
+	pci_virtio_9p.c		\
 	pci_virtio_block.c	\
 	pci_virtio_console.c	\
 	pci_virtio_net.c	\
@@ -69,7 +71,7 @@ SRCS=	\
 .PATH:  ${BHYVE_SYSDIR}/sys/amd64/vmm
 SRCS+=	vmm_instruction_emul.c
 
-LIBADD=	vmmapi md pthread z util sbuf cam
+LIBADD=	vmmapi md pthread z util sbuf cam 9p
 
 .if ${MK_INET_SUPPORT} != "no"
 CFLAGS+=-DINET
@@ -83,6 +85,8 @@ CFLAGS+=-DNO_OPENSSL
 LIBADD+=	crypto
 .endif
 
+CFLAGS+= -DWITHOUT_CAPSICUM
+CFLAGS+= -I${BHYVE_SYSDIR}/contrib/lib9p
 CFLAGS+= -I${BHYVE_SYSDIR}/sys/dev/e1000
 CFLAGS+= -I${BHYVE_SYSDIR}/sys/dev/mii
 CFLAGS+= -I${BHYVE_SYSDIR}/sys/dev/usb/controller
