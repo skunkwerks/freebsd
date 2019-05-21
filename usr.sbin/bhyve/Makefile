@@ -3,6 +3,8 @@
 #
 
 .include <src.opts.mk>
+CFLAGS+=-I${.CURDIR}/../../contrib/lib9p
+.PATH:  ${.CURDIR}/../../contrib/lib9p
 CFLAGS+=-I${SRCTOP}/sys
 .PATH:  ${SRCTOP}/sys/cam/ctl
 
@@ -41,6 +43,7 @@ SRCS=	\
 	pci_lpc.c		\
 	pci_nvme.c		\
 	pci_passthru.c		\
+	pci_virtio_9p.c		\
 	pci_virtio_block.c	\
 	pci_virtio_console.c	\
 	pci_virtio_net.c	\
@@ -69,7 +72,7 @@ SRCS=	\
 .PATH:  ${BHYVE_SYSDIR}/sys/amd64/vmm
 SRCS+=	vmm_instruction_emul.c
 
-LIBADD=	vmmapi md pthread z util sbuf cam
+LIBADD=	vmmapi md pthread z util sbuf cam 9p casper cap_pwd cap_grp
 
 .if ${MK_INET_SUPPORT} != "no"
 CFLAGS+=-DINET
