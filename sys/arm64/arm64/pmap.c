@@ -1815,7 +1815,8 @@ pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage)
 {
 	vm_page_t l0pt;
 
-	KASSERT(stage <= PM_STAGE2, ("Unknown pmap stage %d", stage));
+	KASSERT((stage == PM_STAGE1 || stage == PM_STAGE2), 
+		("Invalid pmap stage %d", stage));
 	KASSERT(!((stage == PM_STAGE2) && (pa_range_bits == 0)),
 	    ("Unknown PARange bits"));
 
@@ -3819,10 +3820,8 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 			new_l3 |= ATTR_SW_MANAGED;
 			if ((prot & VM_PROT_WRITE) != 0) {
 				new_l3 |= ATTR_SW_DBM;
-				if ((flags & VM_PROT_WRITE) == 0) {
-					if (pmap->pm_stage == PM_STAGE1)
+				if ((flags & VM_PROT_WRITE) == 0)
 						new_l3 |= ATTR_S1_AP(ATTR_S1_AP_RO);
-				}
 			}
 		} 
 	} else {
