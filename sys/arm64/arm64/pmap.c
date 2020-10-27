@@ -1815,6 +1815,8 @@ pmap_pinit_stage(pmap_t pmap, enum pmap_stage stage)
 {
 	vm_page_t l0pt;
 
+	KASSERT((stage == PM_STAGE1 || stage == PM_STAGE2), 
+		("Invalid pmap stage %d", stage));
 	KASSERT(!((stage == PM_STAGE2) && (pa_range_bits == 0)),
 	    ("Unknown PARange bits"));
 
