@@ -1,0 +1,60 @@
+.\"
+.\" Copyright (c) 2024 FreeBSD
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd February 6, 2024
+.Dt LFS 3lua
+.Os
+.Sh NAME
+.Nm attributes ,
+.Nm dir ,
+.Nm link ,
+.Nm mkdir ,
+.Nm rmdir ,
+.Nm touch ,
+.Nm unlock
+.Nd Lua filesystem operations module
+.Sh DESCRIPTION
+The
+.Nm lfs
+module provides filesystem operations for Lua programs.
+.Ss APIs Supported
+.Bl -tag -width indent
+.It Fn attributes path [mode]
+Returns a table with file attributes.
+Mode can be "modification", "access", "change", "size", "permissions", "uid", "gid", "type", "blocks", "blksize", or "device".
+.It Fn dir path
+Returns an iterator to list directory contents.
+.It Fn link oldpath newpath [symlink]
+Creates a link. If symlink is true, creates a symbolic link.
+.It Fn mkdir path
+Creates a new directory.
+.It Fn rmdir path
+Removes an empty directory.
+.It Fn touch path [atime] [mtime]
+Sets access and modification times of a file.
+.It Fn unlock handle
+Unlocks a file or a part of it.
+.El
+.Sh EXAMPLES
+List directory contents:
+.Bd -literal -offset indent
+for file in lfs.dir(".") do
+    print(file)
+end
+.Ed
+.Pp
+Get file attributes:
+.Bd -literal -offset indent
+attrs = lfs.attributes("file.txt")
+print(attrs.size)
+.Ed
+.Sh SEE ALSO
+.Xr lua 1 ,
+.Xr luaopen_lfs 3
+.Sh AUTHORS
+The
+.Nm
+man page was written by
+.An FreeBSD

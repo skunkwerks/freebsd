@@ -1,0 +1,66 @@
+.\"
+.\" Copyright (c) 2024 FreeBSD
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd February 6, 2024
+.Dt UCL 3lua
+.Os
+.Sh NAME
+.Nm parser_new ,
+.Nm parser_register_variable ,
+.Nm parser_add_chunk ,
+.Nm parser_get_object ,
+.Nm object_validate
+.Nd Universal Configuration Language (UCL) Lua interface
+.Sh DESCRIPTION
+The
+.Nm ucl
+module provides functions for parsing and manipulating UCL configuration data.
+.Ss APIs Supported
+.Bl -tag -width indent
+.It Fn parser_new
+Creates a new UCL parser instance.
+.It Fn parser_register_variable name value
+Registers a variable that can be used in UCL macros.
+.It Fn parser_add_chunk data [priority]
+Adds a chunk of UCL data to be parsed. Optional priority determines merge order.
+.It Fn parser_get_object
+Returns the parsed UCL object.
+.It Fn object_validate schema
+Validates a UCL object against a schema definition.
+.El
+.Sh EXAMPLES
+Parse a UCL configuration:
+.Bd -literal -offset indent
+local ucl = require "ucl"
+local parser = ucl.parser_new()
+parser:add_chunk([[
+    server {
+        host = "localhost";
+        port = 8080;
+    }
+]])
+local obj = parser:get_object()
+print(obj.server.host)  -- prints "localhost"
+.Ed
+.Pp
+Use variables in UCL:
+.Bd -literal -offset indent
+local parser = ucl.parser_new()
+parser:register_variable("HOSTNAME", "example.com")
+parser:add_chunk([[
+    domain = "$HOSTNAME";
+]])
+local obj = parser:get_object()
+print(obj.domain)  -- prints "example.com"
+.Ed
+.Sh SEE ALSO
+.Xr lua 1 ,
+.Xr libucl 3 ,
+.Xr ucl 5
+.Sh AUTHORS
+The
+.Nm
+man page was written by
+.An FreeBSD

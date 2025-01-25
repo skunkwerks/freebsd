@@ -11,4 +11,6 @@ CFLAGS+=	\
 		-I${UCLSRC}/uthash
 LIBADD+=	ucl
 
+MAN=	ucl.3lua
+
 .include <bsd.lib.mk>

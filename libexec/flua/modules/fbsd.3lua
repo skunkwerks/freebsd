@@ -1,0 +1,36 @@
+.\"
+.\" Copyright (c) 2024 FreeBSD
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd February 6, 2024
+.Dt FBSD 3lua
+.Os
+.Sh NAME
+.Nm exec
+.Nd FreeBSD-specific Lua operations module
+.Sh DESCRIPTION
+The
+.Nm fbsd
+module provides FreeBSD-specific operations for Lua programs.
+.Ss APIs Supported
+.Bl -tag -width indent
+.It Fn exec path [args]
+Executes a program at the specified path with optional arguments.
+The current process is replaced with the new program.
+.El
+.Sh EXAMPLES
+Execute a command:
+.Bd -literal -offset indent
+local fbsd = require "fbsd"
+fbsd.exec("/bin/ls", {"-l", "/tmp"})
+.Ed
+.Sh SEE ALSO
+.Xr lua 1 ,
+.Xr execve 2 ,
+.Xr luaopen_fbsd 3
+.Sh AUTHORS
+The
+.Nm
+man page was written by
+.An FreeBSD

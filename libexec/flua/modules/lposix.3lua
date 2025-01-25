@@ -1,0 +1,107 @@
+.\"
+.\" Copyright (c) 2024 FreeBSD
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd February 6, 2024
+.Dt LPOSIX 3lua
+.Os
+.Sh NAME
+.Nm posix.fnmatch ,
+.Nm posix.libgen ,
+.Nm posix.stdlib ,
+.Nm posix.sys.stat ,
+.Nm posix.sys.utsname ,
+.Nm posix.sys.wait ,
+.Nm posix.unistd
+.Nd Lua POSIX interface module
+.Sh DESCRIPTION
+The
+.Nm lposix
+module provides POSIX system call bindings for Lua programs.
+.Ss Modules Available
+.Bl -tag -width indent
+.It Va posix.fnmatch
+Pattern matching functions.
+.Bl -bullet -compact
+.It
+fnmatch(pattern, string, flags)
+.El
+.It Va posix.libgen
+Path name operations.
+.Bl -bullet -compact
+.It
+basename(path)
+.It
+dirname(path)
+.El
+.It Va posix.stdlib
+Standard library functions.
+.Bl -bullet -compact
+.It
+_exit(status)
+.It
+realpath(path)
+.El
+.It Va posix.sys.stat
+File status operations.
+.Bl -bullet -compact
+.It
+chmod(path, mode)
+.It
+chown(path, uid, gid)
+.El
+.It Va posix.sys.utsname
+System name information.
+.Bl -bullet -compact
+.It
+uname()
+.El
+.It Va posix.sys.wait
+Process wait operations.
+.Bl -bullet -compact
+.It
+wait()
+.El
+.It Va posix.unistd
+POSIX operating system API.
+.Bl -bullet -compact
+.It
+fork()
+.It
+getpid()
+.It
+pipe()
+.It
+read(fd, count)
+.It
+write(fd, data)
+.El
+.El
+.Sh EXAMPLES
+Get system information:
+.Bd -literal -offset indent
+local posix = require "posix"
+local info = posix.sys.utsname.uname()
+print(info.sysname, info.release)
+.Ed
+.Pp
+Create a child process:
+.Bd -literal -offset indent
+local pid = posix.unistd.fork()
+if pid == 0 then
+    -- child process
+    posix.stdlib._exit(0)
+else
+    -- parent process
+    posix.sys.wait.wait()
+end
+.Ed
+.Sh SEE ALSO
+.Xr lua 1 ,
+.Xr luaopen_posix 3
+.Sh AUTHORS
+The
+.Nm
+man page was written by
+.An FreeBSD
