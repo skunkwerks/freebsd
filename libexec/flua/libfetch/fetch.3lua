@@ -18,11 +18,36 @@ including http and file schemes supported by
 .Pp
 The module exports the following functions:
 .Bl -tag -width Ds
-.It Fn fetch.get_url url outfile
+.It Fn fetch.get_url url outfile [headers]
 Downloads the content from the specified
 .Fa url
 and saves it to
 .Fa outfile .
+An optional
+.Fa headers
+table can be provided with HTTP headers as key-value pairs.
+Returns
+.Dv true
+on success, or
+.Dv nil
+and an error message on failure.
+.It Fn fetch.put_url url infile [headers]
+Uploads the content from
+.Fa infile
+to the specified
+.Fa url
+using HTTP PUT.
+Returns
+.Dv true
+on success, or
+.Dv nil
+and an error message on failure.
+.It Fn fetch.post_url url infile [headers]
+Uploads the content from
+.Fa infile
+to the specified
+.Fa url
+using HTTP POST.
 Returns
 .Dv true
 on success, or
@@ -100,6 +125,29 @@ nil     Failed to read from URL: No error: 0
 > f.get_url("https://wrong.host.badssl.com/", "/tmp/i")
 SSL certificate subject doesn't match host wrong.host.badssl.com
 nil     Failed to read from URL: Authentication error
+
+> -- Upload a file using PUT
+> f.put_url("http://example.com/upload", "/tmp/data.txt")
+true
+
+> -- Submit form data using POST
+> f.post_url("http://example.com/submit", "/tmp/form.txt")
+true
+
+> -- GET with custom headers
+> headers = {
+>   ["User-Agent"] = "MyApp/1.0",
+>   ["Accept"] = "application/json"
+> }
+> f.get_url("http://api.example.com/data", "/tmp/data", headers)
+true
+
+> -- POST with content type header
+> headers = {
+>   ["Content-Type"] = "application/json"
+> }
+> f.post_url("http://api.example.com/submit", "/tmp/data.json", headers)
+true
 .Ed
 .Sh SEE ALSO
 .Xr fetch 3 ,
