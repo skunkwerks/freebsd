@@ -1,5 +1,6 @@
 .include <src.lua.mk>
 
+SUBDIR+=	libfetch
 SUBDIR+=	libfreebsd
 SUBDIR+=	libhash
 SUBDIR+=	libjail

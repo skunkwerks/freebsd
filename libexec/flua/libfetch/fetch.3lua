@@ -1,0 +1,113 @@
+.\"
+.\" Copyright (c) 2024 SkunkWerks, GmbH.
+.\"
+.\" SPDX-License-Identifier: BSD-2-Clause
+.\"
+.Dd October 6, 2024
+.Dt FETCH 3lua
+.Os
+.Sh NAME
+.Nm fetch
+.Nd Lua bindings to
+.Xr fetch 3
+library
+.Sh DESCRIPTION
+The bindings allow Lua scripts to parse URI strings and download from URLs,
+including http and file schemes supported by
+.Xr fetch 3
+.Pp
+The module exports the following functions:
+.Bl -tag -width Ds
+.It Fn fetch.get_url url outfile
+Downloads the content from the specified
+.Fa url
+and saves it to
+.Fa outfile .
+Returns
+.Dv true
+on success, or
+.Dv nil
+and an error message on failure.
+.It Fn fetch.parse_url url
+Parses the given
+.Fa url
+and returns a table containing its components.
+The table has the following fields:
+.Bl -bullet -compact
+.It
+scheme
+.It
+user
+.It
+password
+.It
+host
+.It
+port
+.It
+doc (path and query string for HTTP/HTTPS URLs)
+.El
+.Pp
+Returns
+.Dv nil
+and an error message if the URL cannot be parsed.
+.El
+.Sh RETURN VALUES
+The
+.Fn luaopen_fetch
+function returns 1, indicating that it has pushed one value, the table,
+onto the Lua stack.
+.Sh EXAMPLES
+The following Lua code demonstrates how to use the
+.Nm
+module:
+.Bd -literal -offset indent
+/usr/libexec/flua -l f=fetch
+Lua 5.4.4  Copyright (C) 1994-2022 Lua.org, PUC-Rio
+
+> f.parse_url("http:\\")
+nil     Failed to parse URL
+
+> r = f.parse_url("http://localhost/")
+> for k,v in pairs(r) do; print('  ', k, v); end
+  user
+  scheme  http
+  host    localhost
+  doc     /
+  password
+
+> r = f.parse_url("http://user:pass@host:1999/rain?beret=raspberry")
+> for k,v in pairs(r) do; print('  ', k, v); end
+  user    user
+  doc     /rain?beret=raspberry
+  scheme  http
+  host    host
+  port    1999
+  password pass
+
+> f.get_url("file:///var/run/motd", "/tmp/m")
+true
+
+> f.get_url("http://w3.org/", "/tmp/w")
+true
+
+> f.get_url("https://freebsd.org/", "/tmp/f")
+true
+
+> f.get_url("https://invalid.site/", "/tmp/i")
+nil     Failed to read from URL: No error: 0
+
+> f.get_url("https://wrong.host.badssl.com/", "/tmp/i")
+SSL certificate subject doesn't match host wrong.host.badssl.com
+nil     Failed to read from URL: Authentication error
+.Ed
+.Sh SEE ALSO
+.Xr fetch 3 ,
+.Xr fetchGet 3 ,
+.Xr fetchParseURL 3 ,
+.Xr intro 3lua
+.Sh AUTHORS
+The
+.Nm
+man page was written by
+.An Dave Cottlehuber Aq Mt dch@FreeBSD.org .
