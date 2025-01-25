@@ -376,6 +376,7 @@ extern struct	sx allprison_lock;
 /*
  * Sysctls to describe jail parameters.
  */
+SYSCTL_DECL(_security_jail);
 SYSCTL_DECL(_security_jail_param);
 
 #define SYSCTL_JAIL_PARAM_DECL(name)					\

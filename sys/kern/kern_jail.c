@@ -4272,7 +4272,7 @@ prison_path(struct prison *pr1, struct prison *pr2)
 /*
  * Jail-related sysctls.
  */
-static SYSCTL_NODE(_security, OID_AUTO, jail, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
+SYSCTL_NODE(_security, OID_AUTO, jail, CTLFLAG_RW | CTLFLAG_MPSAFE, 0,
     "Jails");
 
 #if defined(INET) || defined(INET6)
