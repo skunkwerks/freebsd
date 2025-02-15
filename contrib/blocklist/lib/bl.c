@@ -1,4 +1,4 @@
-/*	$NetBSD: bl.c,v 1.28 2016/07/29 17:13:09 christos Exp $	*/
+/*	$NetBSD: bl.c,v 1.29 2020/03/10 13:36:08 roy Exp $	*/
 
 /*-
  * Copyright (c) 2014 The NetBSD Foundation, Inc.
@@ -33,7 +33,7 @@
 #endif
 
 #include <sys/cdefs.h>
-__RCSID("$NetBSD: bl.c,v 1.28 2016/07/29 17:13:09 christos Exp $");
+__RCSID("$NetBSD: bl.c,v 1.29 2020/03/10 13:36:08 roy Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -68,7 +68,7 @@ typedef struct {
 	char bl_data[];
 } bl_message_t;
 
-struct blacklist {
+struct blocklist {
 #ifdef _REENTRANT
 	pthread_mutex_t b_mutex;
 # define BL_INIT(b)	pthread_mutex_init(&b->b_mutex, NULL)
@@ -207,7 +207,7 @@ bl_init(bl_t b, bool srv)
 			BL_UNLOCK(b);
 			return -1;
 		}
-		bl_log(b->b_fun, LOG_DEBUG, "Connected to blacklist server",
+		bl_log(b->b_fun, LOG_DEBUG, "Connected to blocklist server",
 		    __func__);
 	}
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.24 2016/04/04 15:52:56 christos Exp $	*/
+/*	$NetBSD: conf.c,v 1.30 2020/03/12 19:47:32 christos Exp $	*/
 
 /*-
  * Copyright (c) 2015 The NetBSD Foundation, Inc.
@@ -33,7 +33,7 @@
 #endif
 
 #include <sys/cdefs.h>
-__RCSID("$NetBSD: conf.c,v 1.24 2016/04/04 15:52:56 christos Exp $");
+__RCSID("$NetBSD: conf.c,v 1.30 2020/03/12 19:47:32 christos Exp $");
 
 #include <stdio.h>
 #ifdef HAVE_LIBUTIL_H
@@ -1005,7 +1005,8 @@ confset_match(const struct confset *cs, struct conf *c,
 #ifdef AF_ROUTE
 static int
 conf_route_perm(int fd) {
-#if defined(RTM_IFANNOUNCE) && defined(SA_SIZE)
+/* Disable for now, the access check in the routing socket uses curlwp */
+#if defined(RTM_IFANNOUNCE) && defined(RT_ROUNDUP)
 	/*
 	 * Send a routing message that is not supported to check for access
 	 * We expect EOPNOTSUPP for having access, since we are sending a
@@ -1024,7 +1025,7 @@ conf_route_perm(int fd) {
 	size_t l;
 
 #define NEXTADDR(s) \
-	l = SA_SIZE(sizeof(*s)); memmove(cp, s, l); cp += l;
+	l = RT_ROUNDUP(sizeof(*s)); memmove(cp, s, l); cp += l;
 	memset(buf, 0, sizeof(buf));
 	rtm->rtm_type = RTM_IFANNOUNCE;
 	rtm->rtm_flags = 0;
